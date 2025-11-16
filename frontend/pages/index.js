@@ -36,6 +36,21 @@ const SearchIcon = () => (
   </svg>
 );
 
+// Copy icon (outline)
+const CopyIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+  </svg>
+);
+
+// Check icon (tick mark, outline)
+const CheckIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+);
+
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -47,6 +62,7 @@ export default function Home() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [detectedLanguage, setDetectedLanguage] = useState('python');
+  const [copied, setCopied] = useState(false); // NEW: Copy state
   
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -329,9 +345,15 @@ export default function Home() {
     setShowSuggestions(true);
   };
 
+  // NEW: Copy code with state change
   const copyCode = () => {
     navigator.clipboard.writeText(code);
-    // TODO: Add toast notification
+    setCopied(true);
+    
+    // Revert back to "Copy" after 2.5 seconds
+    setTimeout(() => {
+      setCopied(false);
+    }, 2500);
   };
 
   return (
@@ -339,7 +361,8 @@ export default function Home() {
       <Head>
         <title>Code Maestro - AI Code Assistant</title>
         <meta name="description" content="Premium AI-Powered Code Assistant" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
       </Head>
 
       <main className={styles.main}>
@@ -351,8 +374,11 @@ export default function Home() {
               {messages.length === 0 && !streamingContent && (
                 <div className={styles.welcomeSection}>
                   <div className={styles.logoContainer}>
-                    {/* Logo will be inserted here - place logo.svg in public folder */}
-                    <img src="/logo.svg" alt="Code Maestro" className={styles.logo} />
+                    <img 
+                      src="/logo.png" 
+                      alt="Code Maestro" 
+                      className={styles.logo}
+                    />
                   </div>
                   <h1 className={styles.welcomeTitle}>Code Maestro</h1>
                   <p className={styles.welcomeSubtitle}>Your AI-powered coding assistant</p>
@@ -495,14 +521,15 @@ export default function Home() {
                 </div>
                 <button 
                   onClick={copyCode}
-                  className={styles.copyButton}
-                  title="Copy code"
+                  className={`${styles.copyButton} ${copied ? styles.copied : ''}`}
+                  title={copied ? "Copied!" : "Copy code"}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  Copy code
+                  <span className={styles.copyIcon}>
+                    {copied ? <CheckIcon /> : <CopyIcon />}
+                  </span>
+                  <span className={styles.copyText}>
+                    {copied ? 'Copied' : 'Copy code'}
+                  </span>
                 </button>
               </div>
               <div className={styles.codeEditorWrapper}>
