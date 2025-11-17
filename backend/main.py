@@ -12,7 +12,7 @@ app = FastAPI(title="Code Maestro API")
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,39 +34,36 @@ class ChatResponse(BaseModel):
     response: str
     model: str
 
-# System prompts
-CODE_GENERATION_PROMPT = """You are an expert programmer assistant. 
-When asked to write code:
-- Provide clean, well-commented code
-- Use best practices and design patterns
-- Explain your approach briefly
-- Include error handling where appropriate
-"""
+# Updated System Prompt - Clean and Concise
+SYSTEM_PROMPT = """You are an expert programming assistant. Follow these rules strictly:
 
-DEBUG_PROMPT = """You are an expert debugging assistant.
-When analyzing code or errors:
-- Identify the root cause of issues
-- Explain why errors occur
-- Provide corrected code
-- Suggest improvements
-"""
+1. NEVER show internal reasoning (no "THINKING:", "PLAN:", "RESPONSE:", etc.)
+2. For code requests: provide code immediately, followed by 2-3 bullet points
+3. Keep explanations minimal and to the point
+4. Never use emojis
+5. No verbose narration or meta-commentary
+6. For negative factorial inputs, return an error message, not 1
+
+Output format for code:
+```language
+[code here]
+```
+
+Key points:
+- Point 1
+- Point 2
+- Point 3 (if needed)
+
+That's it. No additional commentary unless requested."""
 
 async def stream_ollama(messages: List[Message], model: str = "codellama:latest", 
                        temperature: float = 0.7):
-    """
-    Stream responses from Ollama API - KEY OPTIMIZATION!
-    """
+    """Stream responses from Ollama API"""
     try:
         print(f"[DEBUG] Streaming from Ollama with model: {model}")
         
-        # Build the prompt with system context
-        system_msg = CODE_GENERATION_PROMPT
-        if any("error" in msg.content.lower() or "debug" in msg.content.lower() 
-               for msg in messages):
-            system_msg = DEBUG_PROMPT
-        
         # Format messages for Ollama
-        formatted_messages = [{"role": "system", "content": system_msg}]
+        formatted_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         for msg in messages:
             formatted_messages.append({"role": msg.role, "content": msg.content})
         
@@ -74,10 +71,12 @@ async def stream_ollama(messages: List[Message], model: str = "codellama:latest"
         ollama_request = {
             "model": model,
             "messages": formatted_messages,
-            "stream": True,  # KEY: Enable streaming!
+            "stream": True,
             "options": {
                 "temperature": temperature,
-                "num_predict": 2000,  # Max tokens
+                "num_predict": 1500,
+                "num_ctx": 4096,
+                "top_p": 0.9,
             }
         }
         
@@ -104,10 +103,8 @@ async def stream_ollama(messages: List[Message], model: str = "codellama:latest"
                         content = chunk.get("message", {}).get("content", "")
                         
                         if content:
-                            # Send each chunk in SSE format
                             yield f"data: {json.dumps({'content': content, 'done': False})}\n\n"
                         
-                        # Check if streaming is complete
                         if chunk.get("done", False):
                             yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
                             print("[DEBUG] Streaming completed")
@@ -116,9 +113,6 @@ async def stream_ollama(messages: List[Message], model: str = "codellama:latest"
                     except json.JSONDecodeError as e:
                         print(f"[ERROR] Failed to parse chunk: {e}")
                         continue
-                    
-                    # Small delay to prevent overwhelming the client
-                    await asyncio.sleep(0.001)
         
     except requests.Timeout:
         print("[ERROR] Request timeout")
@@ -132,18 +126,11 @@ async def stream_ollama(messages: List[Message], model: str = "codellama:latest"
 
 def call_ollama(messages: List[Message], model: str = "codellama:latest", 
                 temperature: float = 0.7) -> str:
-    """
-    Non-streaming fallback for compatibility
-    """
+    """Non-streaming fallback for compatibility"""
     try:
         print(f"[DEBUG] Calling Ollama (non-streaming) with model: {model}")
         
-        system_msg = CODE_GENERATION_PROMPT
-        if any("error" in msg.content.lower() or "debug" in msg.content.lower() 
-               for msg in messages):
-            system_msg = DEBUG_PROMPT
-        
-        formatted_messages = [{"role": "system", "content": system_msg}]
+        formatted_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         for msg in messages:
             formatted_messages.append({"role": msg.role, "content": msg.content})
         
@@ -178,7 +165,7 @@ async def root():
     return {
         "message": "Code Maestro API",
         "version": "2.0.0",
-        "features": ["streaming", "typewriter-effect"],
+        "features": ["streaming", "clean-output"],
         "endpoints": {
             "/chat": "POST - Send chat messages",
             "/chat/stream": "POST - Send chat messages (streaming)",
@@ -215,10 +202,7 @@ async def list_models():
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """
-    STREAMING endpoint - Returns Server-Sent Events (SSE)
-    This is the FAST version!
-    """
+    """Streaming endpoint - Returns Server-Sent Events (SSE)"""
     try:
         print(f"[DEBUG] Received streaming chat request with {len(request.messages)} messages")
         
@@ -244,9 +228,7 @@ async def chat_stream(request: ChatRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """
-    Non-streaming endpoint for compatibility
-    """
+    """Non-streaming endpoint for compatibility"""
     try:
         print(f"[DEBUG] Received chat request with {len(request.messages)} messages")
         

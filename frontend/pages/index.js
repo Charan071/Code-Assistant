@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import Head from 'next/head';
+import hljs from 'highlight.js';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import styles from '../styles/Home.module.css';
 
 // Icon components to replace emojis
@@ -51,17 +54,149 @@ const CheckIcon = () => (
   </svg>
 );
 
+const LANGUAGE_ROTATION = ['Python', 'JavaScript', 'TypeScript', 'SQL', 'C++', 'Go', 'Rust', 'Ruby', 'C#', 'Swift'];
+const PLACEHOLDER_CODE = '';
+const CODE_PLACEHOLDER_TEXT = 'Your code will appear here...';
+const SUPPORTED_EDITOR_LANGUAGES = new Set([
+  'cpp',
+  'csharp',
+  'css',
+  'go',
+  'html',
+  'java',
+  'javascript',
+  'json',
+  'kotlin',
+  'php',
+  'plaintext',
+  'python',
+  'ruby',
+  'rust',
+  'shell',
+  'sql',
+  'swift',
+  'typescript'
+]);
+
+const LANGUAGE_NORMALIZATION_MAP = {
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  py: 'python',
+  'c++': 'cpp',
+  'c#': 'csharp',
+  cs: 'csharp',
+  sh: 'shell',
+  bash: 'shell',
+  zsh: 'shell',
+  shell: 'shell',
+  plaintext: 'plaintext',
+  text: 'plaintext'
+};
+
+const LANGUAGE_LABEL_MAP = {
+  cpp: 'C++',
+  csharp: 'C#',
+  css: 'CSS',
+  go: 'Go',
+  html: 'HTML',
+  java: 'Java',
+  javascript: 'JavaScript',
+  json: 'JSON',
+  kotlin: 'Kotlin',
+  php: 'PHP',
+  plaintext: 'Plain Text',
+  python: 'Python',
+  ruby: 'Ruby',
+  rust: 'Rust',
+  shell: 'Shell',
+  sql: 'SQL',
+  swift: 'Swift',
+  typescript: 'TypeScript'
+};
+
+const normalizeEditorLanguage = (lang = '') => {
+  const safeValue = lang.trim().toLowerCase();
+  const mapped = LANGUAGE_NORMALIZATION_MAP[safeValue] || safeValue;
+  return SUPPORTED_EDITOR_LANGUAGES.has(mapped) ? mapped : 'plaintext';
+};
+
+const formatLanguageLabel = (lang = 'plaintext') => {
+  const normalized = normalizeEditorLanguage(lang);
+  return LANGUAGE_LABEL_MAP[normalized] || normalized.toUpperCase();
+};
+
+const detectLanguageFromPrompt = (text = '') => {
+  const lowerText = text.toLowerCase();
+
+  if (lowerText.includes('python') || lowerText.includes('def ') || lowerText.includes('import ')) {
+    return 'python';
+  } else if (
+    lowerText.includes('javascript') ||
+    lowerText.includes('const ') ||
+    lowerText.includes('function ') ||
+    lowerText.includes('=>')
+  ) {
+    return 'javascript';
+  } else if (lowerText.includes('typescript') || lowerText.includes('interface ') || lowerText.includes(': string')) {
+    return 'typescript';
+  } else if (lowerText.includes('java') && !lowerText.includes('javascript')) {
+    return 'java';
+  } else if (lowerText.includes('c++') || lowerText.includes('cpp') || lowerText.includes('#include')) {
+    return 'cpp';
+  } else if (lowerText.includes('c#') || lowerText.includes('csharp')) {
+    return 'csharp';
+  } else if (lowerText.includes('rust') || lowerText.includes('fn ') || lowerText.includes('let mut')) {
+    return 'rust';
+  } else if (lowerText.includes('go') || lowerText.includes('golang') || lowerText.includes('func ')) {
+    return 'go';
+  } else if (lowerText.includes('sql') || lowerText.includes('select ') || lowerText.includes('insert into')) {
+    return 'sql';
+  } else if (lowerText.includes('ruby') || lowerText.includes('puts ') || lowerText.includes('end')) {
+    return 'ruby';
+  } else if (lowerText.includes('html') || lowerText.includes('<div') || lowerText.includes('<html')) {
+    return 'html';
+  } else if (lowerText.includes('css') || lowerText.includes('font-family') || lowerText.includes('color:')) {
+    return 'css';
+  } else if (lowerText.includes('php') || lowerText.includes('<?php')) {
+    return 'php';
+  } else if (lowerText.includes('json') || lowerText.includes('"') && lowerText.includes('{')) {
+    return 'json';
+  } else if (lowerText.includes('swift') || lowerText.includes('import swiftui')) {
+    return 'swift';
+  }
+
+  return 'plaintext';
+};
+
+const detectLanguageFromCode = (codeText = '') => {
+  try {
+    if (!codeText.trim()) {
+      return 'plaintext';
+    }
+    const result = hljs.highlightAuto(codeText);
+    return normalizeEditorLanguage(result.language || 'plaintext');
+  } catch (error) {
+    console.error('[ERROR] highlight.js detection failed:', error);
+    return 'plaintext';
+  }
+};
+
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [code, setCode] = useState('// Your code will appear here...\n');
+  const [code, setCode] = useState(PLACEHOLDER_CODE);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState('codellama:latest');
   const [availableModels, setAvailableModels] = useState([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [detectedLanguage, setDetectedLanguage] = useState('python');
+  const [detectedLanguage, setDetectedLanguage] = useState('plaintext');
+  const [isEditorEmpty, setIsEditorEmpty] = useState(true);
+  const [rotatingLanguage, setRotatingLanguage] = useState(LANGUAGE_ROTATION[0]);
   const [copied, setCopied] = useState(false); // NEW: Copy state
   
   const messagesEndRef = useRef(null);
@@ -76,29 +211,9 @@ export default function Home() {
     { text: "Create a binary search tree implementation", icon: <SearchIcon /> }
   ];
 
-  // Language detection function
-  const detectLanguage = (text) => {
-    const lowerText = text.toLowerCase();
-    
-    if (lowerText.includes('python') || lowerText.includes('def ') || lowerText.includes('import ')) {
-      return 'python';
-    } else if (lowerText.includes('javascript') || lowerText.includes('const ') || lowerText.includes('function ') || lowerText.includes('=>')) {
-      return 'javascript';
-    } else if (lowerText.includes('java') && !lowerText.includes('javascript')) {
-      return 'java';
-    } else if (lowerText.includes('c++') || lowerText.includes('cpp') || lowerText.includes('#include')) {
-      return 'cpp';
-    } else if (lowerText.includes('rust') || lowerText.includes('fn ') || lowerText.includes('let mut')) {
-      return 'rust';
-    } else if (lowerText.includes('go') || lowerText.includes('golang') || lowerText.includes('func ')) {
-      return 'go';
-    }
-    
-    return 'python'; // default
-  };
-
   // Language icon mapping
   const getLanguageIcon = (lang) => {
+    const normalized = normalizeEditorLanguage(lang);
     const icons = {
       python: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -109,6 +224,12 @@ export default function Home() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="2" y="2" width="20" height="20" rx="2"/>
           <path d="M8 12h8M12 8v8"/>
+        </svg>
+      ),
+      typescript: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M8 9h8M12 9v6M10 15h4" />
         </svg>
       ),
       java: (
@@ -123,6 +244,12 @@ export default function Home() {
           <path d="M9 12h6M12 9v6"/>
         </svg>
       ),
+      csharp: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9 9h3M9 15h3M15 9v6M17 10v4" />
+        </svg>
+      ),
       rust: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 2L2 7v10l10 5 10-5V7z"/>
@@ -132,9 +259,60 @@ export default function Home() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10"/>
         </svg>
+      ),
+      sql: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <ellipse cx="12" cy="6" rx="7" ry="3" />
+          <path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6" />
+        </svg>
+      ),
+      json: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M7 8v4l-2 2 2 2v4M17 8v4l2 2-2 2v4" />
+        </svg>
+      ),
+      html: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 4h16v16H4z" />
+          <path d="M8 9h8M8 13h5" />
+        </svg>
+      ),
+      css: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M6 4h12l-1 14-5 2-5-2-1-14z" />
+          <path d="M9 8h6M9 12h5" />
+        </svg>
+      ),
+      ruby: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3l7 5-7 13-7-13 7-5z" />
+        </svg>
+      ),
+      swift: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 8c2 4 6 7 10 8-3-2-5-5-6-7 2 2 5 4 8 5 1-3 0-6-2-9 3 2 5 5 6 9-1 5-5 7-10 7-3 0-6-1-8-3" />
+        </svg>
+      ),
+      plaintext: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M8 9h8M8 13h6M8 17h4" />
+        </svg>
+      ),
+      shell: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 6h12l4 4v8H4z" />
+          <path d="M8 14h4M8 10h2" />
+        </svg>
+      ),
+      default: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9 12h6M12 9v6" />
+        </svg>
       )
     };
-    return icons[lang] || icons.python;
+    return icons[normalized] || icons.default;
   };
 
   // Smooth scroll to bottom
@@ -150,6 +328,37 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, streamingContent]);
+
+  useEffect(() => {
+    if (!isEditorEmpty) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setRotatingLanguage((prev) => {
+        const currentIndex = LANGUAGE_ROTATION.indexOf(prev);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % LANGUAGE_ROTATION.length;
+        return LANGUAGE_ROTATION[nextIndex];
+      });
+    }, 1600);
+
+    return () => clearInterval(intervalId);
+  }, [isEditorEmpty]);
+
+  useEffect(() => {
+    const trimmedCode = (code || '').trim();
+    const normalizedPlaceholder = PLACEHOLDER_CODE.trim();
+    const editorIsEmpty = !trimmedCode || trimmedCode === normalizedPlaceholder;
+
+    setIsEditorEmpty(editorIsEmpty);
+
+    if (editorIsEmpty) {
+      setDetectedLanguage('plaintext');
+      return;
+    }
+
+    setDetectedLanguage(detectLanguageFromCode(code));
+  }, [code]);
 
   // Fetch available models
   useEffect(() => {
@@ -176,8 +385,8 @@ export default function Home() {
   const extractCode = (text) => {
     const codeMatch = text.match(/```([\w]*)\n([\s\S]*?)```/);
     if (codeMatch) {
-      const lang = codeMatch[1] || 'python';
-      setDetectedLanguage(lang.toLowerCase());
+      const lang = codeMatch[1] || 'plaintext';
+      setDetectedLanguage(normalizeEditorLanguage(lang));
       return codeMatch[2];
     }
     return null;
@@ -198,7 +407,7 @@ export default function Home() {
     if (!textToSend.trim() || loading) return;
 
     // Detect language from user input
-    const detected = detectLanguage(textToSend);
+    const detected = normalizeEditorLanguage(detectLanguageFromPrompt(textToSend));
     setDetectedLanguage(detected);
 
     // Hide suggestions after first message
@@ -341,7 +550,10 @@ export default function Home() {
   const clearChat = () => {
     setMessages([]);
     setStreamingContent('');
-    setCode('// Your code will appear here...\n');
+    setCode(PLACEHOLDER_CODE);
+    setDetectedLanguage('plaintext');
+    setIsEditorEmpty(true);
+    setRotatingLanguage(LANGUAGE_ROTATION[0]);
     setShowSuggestions(true);
   };
 
@@ -355,6 +567,13 @@ export default function Home() {
       setCopied(false);
     }, 2500);
   };
+
+  const handleEditorChange = (value) => {
+    setCode(value ?? '');
+  };
+
+  const languageLabel = isEditorEmpty ? rotatingLanguage : formatLanguageLabel(detectedLanguage);
+  const languageIconKey = isEditorEmpty ? normalizeEditorLanguage(rotatingLanguage) : detectedLanguage;
 
   return (
     <div className={styles.container}>
@@ -402,34 +621,106 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Chat messages */}
+              {/* Chat messages - Wallpaper style with Markdown */}
               <div className={styles.messagesFlow}>
                 {messages.map((msg, idx) => (
                   <div 
                     key={idx} 
-                    className={`${styles.messageWrapper} ${styles.fadeInUp}`}
+                    className={`${styles.messageWrapper} ${styles.fadeInUp} ${
+                      msg.role === 'user' ? styles.userMessage : styles.assistantMessage
+                    }`}
                     style={{ animationDelay: `${idx * 0.1}s` }}
                   >
-                    <div className={msg.role === 'user' ? styles.userBubble : styles.aiBubble}>
-                      <div className={styles.messageContent}>
+                    <div className={styles.messageContent}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({node, inline, className, children, ...props}) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const language = match ? match[1] : null;
+                            
+                            return !inline ? (
+                              <pre className={styles.codeBlock}>
+                                <code className={language ? `language-${language}` : ''} {...props}>
+                                  {children}
+                                </code>
+                              </pre>
+                            ) : (
+                              <code className={styles.inlineCode} {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          p({children}) {
+                            return <p className={styles.paragraph}>{children}</p>;
+                          },
+                          ul({children}) {
+                            return <ul className={styles.list}>{children}</ul>;
+                          },
+                          ol({children}) {
+                            return <ol className={styles.orderedList}>{children}</ol>;
+                          },
+                          li({children}) {
+                            return <li className={styles.listItem}>{children}</li>;
+                          },
+                          strong({children}) {
+                            return <strong className={styles.bold}>{children}</strong>;
+                          },
+                        }}
+                      >
                         {msg.content}
-                      </div>
+                      </ReactMarkdown>
                     </div>
                   </div>
                 ))}
                 
                 {/* Streaming message with typewriter effect */}
                 {isStreaming && streamingContent && (
-                  <div className={`${styles.messageWrapper} ${styles.fadeInUp}`}>
-                    <div className={styles.aiBubble}>
-                      <div className={styles.streamingIndicator}>
-                        <span className={styles.streamingDot}></span>
-                        <span className={styles.streamingText}>Generating</span>
-                      </div>
-                      <div className={styles.messageContent}>
+                  <div className={`${styles.messageWrapper} ${styles.fadeInUp} ${styles.assistantMessage}`}>
+                    <div className={styles.streamingIndicator}>
+                      <span className={styles.streamingDot}></span>
+                      <span className={styles.streamingText}>Generating</span>
+                    </div>
+                    <div className={styles.messageContent}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({node, inline, className, children, ...props}) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const language = match ? match[1] : null;
+                            
+                            return !inline ? (
+                              <pre className={styles.codeBlock}>
+                                <code className={language ? `language-${language}` : ''} {...props}>
+                                  {children}
+                                </code>
+                              </pre>
+                            ) : (
+                              <code className={styles.inlineCode} {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          p({children}) {
+                            return <p className={styles.paragraph}>{children}</p>;
+                          },
+                          ul({children}) {
+                            return <ul className={styles.list}>{children}</ul>;
+                          },
+                          ol({children}) {
+                            return <ol className={styles.orderedList}>{children}</ol>;
+                          },
+                          li({children}) {
+                            return <li className={styles.listItem}>{children}</li>;
+                          },
+                          strong({children}) {
+                            return <strong className={styles.bold}>{children}</strong>;
+                          },
+                        }}
+                      >
                         {streamingContent}
-                        <span className={styles.typingCursor}></span>
-                      </div>
+                      </ReactMarkdown>
+                      <span className={styles.typingCursor}></span>
                     </div>
                   </div>
                 )}
@@ -513,11 +804,11 @@ export default function Home() {
           <div className={styles.codePanel}>
             <div className={styles.codeContainer}>
               <div className={styles.codeHeader}>
-                <div className={styles.languageTag}>
+                <div className={`${styles.languageTag} ${isEditorEmpty ? styles.languageRotating : ''}`}>
                   <span className={styles.languageIcon}>
-                    {getLanguageIcon(detectedLanguage)}
+                    {getLanguageIcon(languageIconKey)}
                   </span>
-                  <span>{detectedLanguage}</span>
+                  <span>{languageLabel}</span>
                 </div>
                 <button 
                   onClick={copyCode}
@@ -539,7 +830,7 @@ export default function Home() {
                   language={detectedLanguage}
                   theme="vs-dark"
                   value={code}
-                  onChange={(value) => setCode(value)}
+                  onChange={handleEditorChange}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 14,
@@ -551,6 +842,7 @@ export default function Home() {
                     tabSize: 2,
                     fontFamily: "'JetBrains Mono', 'Fira Code', 'Monaco', monospace",
                     padding: { top: 16, bottom: 16 },
+                    placeholder: CODE_PLACEHOLDER_TEXT
                   }}
                 />
               </div>
