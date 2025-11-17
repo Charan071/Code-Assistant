@@ -1,4 +1,4 @@
-# 🎼 Code Maestro
+# Code Maestro
 
 > A real-time AI-powered code assistant with streaming responses and typewriter effects
 
