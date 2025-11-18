@@ -444,18 +444,18 @@ If you find this project useful, please consider giving it a star! ⭐
 
 ## 📧 Contact & Support
 
-**Developer**: Chara
+**Developer**: Charan Naik
 
-- 💼 Portfolio: [Your Portfolio URL]
-- 🐙 GitHub: [@yourusername](https://github.com/yourusername)
-- 💼 LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourusername)
-- 📧 Email: your.email@example.com
+- 💼 Portfolio: [Portfolio URL]
+- 🐙 GitHub: [@Charan Naik](https://github.com/Charan071/About-me)
+- 💼 LinkedIn: [Your LinkedIn](https://linkedin.com/in/charan-s-naik)
+- 📧 Email: charan.naikk06@example.com
 
 ### Getting Help
 
-- 🐛 **Bug Reports**: [Open an issue](https://github.com/yourusername/code-maestro/issues)
-- 💡 **Feature Requests**: [Start a discussion](https://github.com/yourusername/code-maestro/discussions)
-- 📖 **Documentation**: Check our [Wiki](https://github.com/yourusername/code-maestro/wiki)
+- 🐛 **Bug Reports**: [Open an issue](https://github.com/Charan071/Code-Assistant/issues)
+- 💡 **Feature Requests**: [Start a discussion](https://github.com/Charan071/Code-Assistant/discussions)
+- 📖 **Documentation**: Check our [Wiki](https://github.com/Charan071/Code-Assistant/wiki)
 
 ## 🎯 Roadmap
 
@@ -473,7 +473,6 @@ If you find this project useful, please consider giving it a star! ⭐
 
 ### Future
 - [ ] VS Code extension
-- [ ] Mobile apps (iOS/Android)
 - [ ] Plugin system
 - [ ] Custom model training
 
@@ -487,6 +486,6 @@ Give a ⭐️ if this project helped you!
 
 **Built with ❤️ by developers, for developers**
 
-[Report Bug](https://github.com/yourusername/code-maestro/issues) · [Request Feature](https://github.com/yourusername/code-maestro/issues) · [Documentation](https://github.com/yourusername/code-maestro/wiki)
+[Report Bug](https://github.com/Charan071/Code-Assistant/issues) · [Request Feature](https://github.com/Charan071/Code-Assistant/issues) · [Documentation](https://github.com/Charan071/Code-Assistant/wiki)
 
 </div>
