@@ -2,7 +2,7 @@
 
 > A modern, real-time AI-powered code assistant with streaming responses and premium UI
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
+![Version](https://img.shields.io/badge/version-0.0.5-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green)
 ![Next.js](https://img.shields.io/badge/Next.js-14.0-black)
 ![React](https://img.shields.io/badge/React-18.2-blue)
