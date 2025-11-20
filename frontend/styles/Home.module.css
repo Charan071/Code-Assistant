@@ -52,6 +52,7 @@
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(64, 64, 64, 0.3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  width: 100%;
 }
 
 .headerLeft {
@@ -475,6 +476,12 @@
   background: rgba(64, 64, 64, 0.9);
 }
 
+.codeBlockContent pre {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .codeBlock code {
   color: #e5e5e5;
   background: transparent;
@@ -590,6 +597,7 @@
   background: #262626;
   border-top: 1px solid rgba(64, 64, 64, 0.3);
   padding: 16px 24px;
+  width: 100%;
 }
 
 .inputContainer {

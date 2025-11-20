@@ -3,6 +3,8 @@ import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import styles from '../styles/Home.module.css';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/atom-one-dark.css';
 
 // Icon components
 const CodeIcon = () => (
@@ -70,6 +72,19 @@ const RefreshIcon = () => (
 // Code Block Component with Copy Button
 const CodeBlock = ({ language, children }) => {
   const [copied, setCopied] = useState(false);
+  const codeRef = useRef(null);
+
+  useEffect(() => {
+    if (codeRef.current) {
+      if (language) {
+        try {
+          hljs.highlightElement(codeRef.current);
+        } catch (error) {
+          console.error('Highlighting error:', error);
+        }
+      }
+    }
+  }, [language, children]);
 
   const copyCode = () => {
     const code = String(children).replace(/\n$/, '');
@@ -102,7 +117,11 @@ const CodeBlock = ({ language, children }) => {
         </button>
       </div>
       <div className={styles.codeBlockContent}>
-        <code>{children}</code>
+        <pre>
+          <code ref={codeRef} className={language ? `language-${language}` : ''}>
+            {children}
+          </code>
+        </pre>
       </div>
     </div>
   );
@@ -438,15 +457,19 @@ export default function Home() {
                             const match = /language-(\w+)/.exec(className || '');
                             const language = match ? match[1] : null;
                             
-                            return !inline ? (
-                              <CodeBlock language={language}>
-                                {children}
-                              </CodeBlock>
-                            ) : (
-                              <code className={styles.inlineCode} {...props}>
-                                {children}
-                              </code>
-                            );
+                            // Use inline code (single backticks) for single tokens or short expressions
+                            // Use fenced code blocks (triple backticks) for multi-line or substantial code snippets
+                            if (inline) {
+                              // Single backtick - always render as inline code
+                              return <code className={styles.inlineCode} {...props}>{children}</code>;
+                            } else {
+                              // Triple backticks - render as code block
+                              return (
+                                <CodeBlock language={language}>
+                                  {children}
+                                </CodeBlock>
+                              );
+                            }
                           },
                           p({children}) {
                             return <p className={styles.paragraph}>{children}</p>;
@@ -498,15 +521,19 @@ export default function Home() {
                             const match = /language-(\w+)/.exec(className || '');
                             const language = match ? match[1] : null;
                             
-                            return !inline ? (
-                              <CodeBlock language={language}>
-                                {children}
-                              </CodeBlock>
-                            ) : (
-                              <code className={styles.inlineCode} {...props}>
-                                {children}
-                              </code>
-                            );
+                            // Use inline code (single backticks) for single tokens or short expressions
+                            // Use fenced code blocks (triple backticks) for multi-line or substantial code snippets
+                            if (inline) {
+                              // Single backtick - always render as inline code
+                              return <code className={styles.inlineCode} {...props}>{children}</code>;
+                            } else {
+                              // Triple backticks - render as code block
+                              return (
+                                <CodeBlock language={language}>
+                                  {children}
+                                </CodeBlock>
+                              );
+                            }
                           },
                           p({children}) {
                             return <p className={styles.paragraph}>{children}</p>;
